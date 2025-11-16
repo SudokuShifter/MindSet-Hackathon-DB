@@ -6,6 +6,14 @@ from yoyo import step
 
 __depends__ = {}
 
+steps = """
+Init migration
+"""
+
+from yoyo import step
+
+__depends__ = {}
+
 steps = [
     step(
     """
@@ -15,16 +23,23 @@ steps = [
         "id" UUID NOT NULL PRIMARY KEY,
         "first_name" VARCHAR(100) NOT NULL,
         "second_name" VARCHAR(100) NOT NULL,
-        "email" VARCHAR(100),
-        "password" VARCHAR(255),
-        "description" VARCHAR(1000),
-        "personality_type" personality_type,
-        "created_at" TIMESTAMP NOT NULL
+        "email" VARCHAR(100) NOT NULL UNIQUE,
+        "password" VARCHAR(255) NOT NULL,
+        "test_id" UUID,
+        "created_at" TIMESTAMP NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE "StreakUpd" (
+        "id" UUID NOT NULL PRIMARY KEY,
+        "count" INT NOT NULL DEFAULT 0,
+        "last_update" timestamp NOT NULL,
+        "user_id" UUID NOT NULL
     );
 
     CREATE TABLE "Session" (
         "id" UUID NOT NULL PRIMARY KEY,
         "user_id" UUID NOT NULL,
+        "session_token" VARCHAR NOT NULL,
         "created_at" TIMESTAMP NOT NULL,
         "expire_in" TIMESTAMP NOT NULL
     );
@@ -33,15 +48,30 @@ steps = [
         "id" UUID NOT NULL PRIMARY KEY,
         "date" TIMESTAMP NOT NULL,
         "mood_type_id" UUID NOT NULL,
-        "user_id" UUID NOT NULL,
-        "advice_id" UUID
+        "user_id" UUID NOT NULL
+    );
+    
+    CREATE TABLE "ToDoCalendar" (
+        "id" UUID NOT NULL PRIMARY KEY,
+        "date" TIMESTAMP NOT NULL,
+        "user_id" UUID NOT NULL
     );
 
-    CREATE TABLE "LLMAdvice" (
+    CREATE TABLE "ToDoMood" (
         "id" UUID NOT NULL PRIMARY KEY,
-        "advice" VARCHAR(1000) NOT NULL,
-        "checkbox" BOOLEAN NOT NULL DEFAULT 'false',
-        "created_at" TIMESTAMP
+        "advice" VARCHAR(1000),
+        "checkbox" BOOLEAN NOT NULL DEFAULT false,
+        "time_start" VARCHAR(100),
+        "time_end" VARCHAR(100),
+        "todo_calendar_id" UUID NOT NULL,
+        "mood_type_id" UUID NOT NULL
+    );
+
+    CREATE TABLE "OnboardingTestResult" (
+        "id" UUID NOT NULL PRIMARY KEY,
+        "result" JSONB NOT NULL,
+        "personality_type" personality_type,
+        "user_id" UUID
     );
 
     CREATE TABLE "Mood" (
@@ -66,38 +96,64 @@ steps = [
         "description" TEXT
     );
 
+    -- Foreign key constraints
+    ALTER TABLE "StreakUpd"
+    ADD FOREIGN KEY ("user_id") REFERENCES "User"("id")
+    ON UPDATE NO ACTION ON DELETE CASCADE;
+    
     ALTER TABLE "Session"
-    ADD FOREIGN KEY("user_id") REFERENCES "User"("id")
+    ADD FOREIGN KEY ("user_id") REFERENCES "User"("id")
     ON UPDATE NO ACTION ON DELETE CASCADE;
     
-    ALTER TABLE "Calendar"
-    ADD FOREIGN KEY("mood_type_id") REFERENCES "MoodType"("id")
+    ALTER TABLE "ToDoCalendar"
+    ADD FOREIGN KEY ("user_id") REFERENCES "User"("id")
+    ON UPDATE NO ACTION ON DELETE CASCADE;
+    
+    ALTER TABLE "ToDoMood"
+    ADD FOREIGN KEY ("todo_calendar_id") REFERENCES "ToDoCalendar"("id")
+    ON UPDATE NO ACTION ON DELETE CASCADE;
+    
+    ALTER TABLE "ToDoMood"
+    ADD FOREIGN KEY ("mood_type_id") REFERENCES "MoodType"("id")
     ON UPDATE NO ACTION ON DELETE NO ACTION;
     
     ALTER TABLE "Calendar"
-    ADD FOREIGN KEY("user_id") REFERENCES "User"("id")
-    ON UPDATE NO ACTION ON DELETE CASCADE;
+    ADD FOREIGN KEY ("mood_type_id") REFERENCES "MoodType"("id")
+    ON UPDATE NO ACTION ON DELETE NO ACTION;
     
     ALTER TABLE "Calendar"
-    ADD FOREIGN KEY("advice_id") REFERENCES "LLMAdvice"("id")
+    ADD FOREIGN KEY ("user_id") REFERENCES "User"("id")
+    ON UPDATE NO ACTION ON DELETE CASCADE;
+    
+    ALTER TABLE "OnboardingTestResult"
+    ADD FOREIGN KEY ("user_id") REFERENCES "User"("id")
     ON UPDATE NO ACTION ON DELETE CASCADE;
     
     ALTER TABLE "Mood"
-    ADD FOREIGN KEY("mood_type_id") REFERENCES "MoodType"("id")
+    ADD FOREIGN KEY ("mood_type_id") REFERENCES "MoodType"("id")
     ON UPDATE NO ACTION ON DELETE NO ACTION;
     
     ALTER TABLE "Mood"
-    ADD FOREIGN KEY("activity_type_id") REFERENCES "ActivityType"("id")
+    ADD FOREIGN KEY ("activity_type_id") REFERENCES "ActivityType"("id")
     ON UPDATE NO ACTION ON DELETE NO ACTION;
     
     ALTER TABLE "Mood"
-    ADD FOREIGN KEY("calendar_id") REFERENCES "Calendar"("id")
+    ADD FOREIGN KEY ("calendar_id") REFERENCES "Calendar"("id")
     ON UPDATE NO ACTION ON DELETE CASCADE;
 
-    CREATE INDEX ON "Session" ("user_id");
-    CREATE INDEX ON "Calendar" ("user_id", "date");
-    CREATE INDEX ON "Mood" ("calendar_id");
+    -- Indexes
+    CREATE INDEX idx_session_user_id ON "Session" ("user_id");
+    CREATE INDEX idx_session_token ON "Session" ("session_token");
+    CREATE INDEX idx_calendar_user_date ON "Calendar" ("user_id", "date");
+    CREATE INDEX idx_calendar_date ON "Calendar" ("date");
+    CREATE INDEX idx_mood_calendar_id ON "Mood" ("calendar_id");
+    CREATE INDEX idx_todo_calendar_user_id ON "ToDoCalendar" ("user_id");
+    CREATE INDEX idx_todo_calendar_date ON "ToDoCalendar" ("date");
+    CREATE INDEX idx_todo_mood_calendar_id ON "ToDoMood" ("todo_calendar_id");
+    CREATE INDEX idx_user_email ON "User" ("email");
+    CREATE INDEX idx_test_result_user_id ON "OnboardingTestResult" ("user_id");
 
+    -- Insert initial data
     INSERT INTO "MoodType" (id, title, description, score) VALUES 
     (gen_random_uuid(), 'Спокойствие', 'Состояние умиротворения и отсутствия тревоги', 8),
     (gen_random_uuid(), 'Волнение', 'Чувство трепета и предвкушения', 7),
@@ -125,13 +181,15 @@ steps = [
     (gen_random_uuid(), 'Отдых', 'Свободное время для расслабления и хобби');
     """,
     """
-    DROP TYPE IF EXISTS public.personality_type CASCADE;
-    DROP TABLE IF EXISTS "User";
-    DROP TABLE IF EXISTS "Session";
-    DROP TABLE IF EXISTS "Calendar";
-    DROP TABLE IF EXISTS "LLMAdvice";
-    DROP TABLE IF EXISTS "Mood";
-    DROP TABLE IF EXISTS "MoodType";
-    DROP TABLE IF EXISTS "ActivityType";
+    DROP TABLE IF EXISTS "ToDoMood" CASCADE;
+    DROP TABLE IF EXISTS "ToDoCalendar" CASCADE;
+    DROP TABLE IF EXISTS "Mood" CASCADE;
+    DROP TABLE IF EXISTS "OnboardingTestResult" CASCADE;
+    DROP TABLE IF EXISTS "Calendar" CASCADE;
+    DROP TABLE IF EXISTS "Session" CASCADE;
+    DROP TABLE IF EXISTS "User" CASCADE;
+    DROP TABLE IF EXISTS "MoodType" CASCADE;
+    DROP TABLE IF EXISTS "ActivityType" CASCADE;
+    DROP TYPE IF EXISTS personality_type CASCADE;
     """)
 ]
