@@ -47,7 +47,7 @@ steps = [
     CREATE TABLE "Calendar" (
         "id" UUID NOT NULL PRIMARY KEY,
         "date" TIMESTAMP NOT NULL,
-        "mood_type_id" UUID NOT NULL,
+        "mood_type_id" UUID,
         "user_id" UUID NOT NULL
     );
     
@@ -184,6 +184,7 @@ steps = [
     DROP TABLE IF EXISTS "ToDoMood" CASCADE;
     DROP TABLE IF EXISTS "ToDoCalendar" CASCADE;
     DROP TABLE IF EXISTS "Mood" CASCADE;
+    DROP TABLE IF EXISTS "StreakUpd" CASCADE;
     DROP TABLE IF EXISTS "OnboardingTestResult" CASCADE;
     DROP TABLE IF EXISTS "Calendar" CASCADE;
     DROP TABLE IF EXISTS "Session" CASCADE;
