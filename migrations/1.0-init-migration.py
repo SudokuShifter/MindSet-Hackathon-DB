@@ -46,14 +46,14 @@ steps = [
 
     CREATE TABLE "Calendar" (
         "id" UUID NOT NULL PRIMARY KEY,
-        "date" TIMESTAMP NOT NULL,
+        "date" TIMESTAMP NOT NULL UNIQUE,
         "mood_type_id" UUID,
         "user_id" UUID NOT NULL
     );
     
     CREATE TABLE "ToDoCalendar" (
         "id" UUID NOT NULL PRIMARY KEY,
-        "date" TIMESTAMP NOT NULL,
+        "date" TIMESTAMP NOT NULL UNIQUE,
         "user_id" UUID NOT NULL
     );
 
@@ -69,7 +69,7 @@ steps = [
 
     CREATE TABLE "OnboardingTestResult" (
         "id" UUID NOT NULL PRIMARY KEY,
-        "result" JSONB NOT NULL,
+        "result" VARCHAR(1000) NOT NULL,
         "personality_type" personality_type,
         "user_id" UUID
     );
